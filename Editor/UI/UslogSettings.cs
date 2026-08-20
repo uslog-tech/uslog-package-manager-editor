@@ -29,12 +29,20 @@ namespace Uslog.PackageManager.Editor
             set => EditorPrefs.SetString(RegistryUrlKey, UslogApiClient.NormalizeRegistryUrl(value));
         }
 
-        /// <summary>併用モードで manifest.json に書く scopes。前方一致。</summary>
+        /// <summary>
+        /// 併用モードで manifest.json に書く scopes。前方一致。
+        ///
+        /// USLOG のパッケージは原則 <c>tech.uslog.*</c> なので、既定はこれ 1 本でよい。
+        ///
+        /// この拡張自身（tech.uslog.package-manager）も同じ接頭辞に入るが、
+        /// 衝突はしない。VPM が Packages/ 直下に展開する embedded パッケージは、
+        /// scopedRegistries の解決対象にならないため。
+        /// </summary>
         public static IReadOnlyList<string> Scopes
         {
             get
             {
-                var raw = EditorPrefs.GetString(ScopesKey, "com.uslog");
+                var raw = EditorPrefs.GetString(ScopesKey, "tech.uslog");
                 var parts = raw.Split(',');
                 var result = new List<string>();
 
@@ -44,7 +52,7 @@ namespace Uslog.PackageManager.Editor
                     if (trimmed.Length > 0) result.Add(trimmed);
                 }
 
-                return result.Count > 0 ? result : new List<string> { "com.uslog" };
+                return result.Count > 0 ? result : new List<string> { "tech.uslog" };
             }
             set => EditorPrefs.SetString(ScopesKey, string.Join(",", value));
         }
@@ -80,7 +88,7 @@ namespace Uslog.PackageManager.Editor
 
                     EditorGUILayout.HelpBox(
                         "Unity 標準の Package Manager でも使うときに manifest.json へ書く値です。" +
-                        "前方一致なので com.uslog と書けば com.uslog.* が対象になります。",
+                        "前方一致なので tech.uslog と書けば tech.uslog.* が対象になります。",
                         MessageType.Info);
 
                     EditorGUILayout.Space();

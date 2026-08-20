@@ -137,7 +137,7 @@ namespace Uslog.PackageManager.Editor
             var url = UslogApiClient.NormalizeRegistryUrl(registryUrl);
             if (string.IsNullOrEmpty(url)) throw new ArgumentException("レジストリ URL が空です", nameof(registryUrl));
 
-            scopes = scopes != null && scopes.Count > 0 ? scopes : new[] { "com.uslog" };
+            scopes = scopes != null && scopes.Count > 0 ? scopes : new[] { "tech.uslog" };
 
             JsonValue root;
             if (File.Exists(manifestPath))

@@ -41,11 +41,11 @@ namespace Uslog.PackageManager.Editor.Tests
         {
             // 片方だけ書くと、VCC の Resolve で消されたり戻されたりする。
             var manifest = VpmManifest.Load(_project);
-            manifest.Add("com.uslog.example", "1.2.3", new Dictionary<string, string> { { "com.vrchat.base", "3.x" } });
+            manifest.Add("tech.uslog.example", "1.2.3", new Dictionary<string, string> { { "com.vrchat.base", "3.x" } });
 
-            Assert.AreEqual("1.2.3", manifest.Dependencies["com.uslog.example"]["version"].AsString);
-            Assert.AreEqual("1.2.3", manifest.LockedVersion("com.uslog.example"));
-            Assert.AreEqual("3.x", manifest.Locked["com.uslog.example"]["dependencies"]["com.vrchat.base"].AsString);
+            Assert.AreEqual("1.2.3", manifest.Dependencies["tech.uslog.example"]["version"].AsString);
+            Assert.AreEqual("1.2.3", manifest.LockedVersion("tech.uslog.example"));
+            Assert.AreEqual("3.x", manifest.Locked["tech.uslog.example"]["dependencies"]["com.vrchat.base"].AsString);
         }
 
         [Test]
@@ -58,25 +58,25 @@ namespace Uslog.PackageManager.Editor.Tests
 }");
 
             var manifest = VpmManifest.Load(_project);
-            manifest.Add("com.uslog.example", "1.0.0", null);
+            manifest.Add("tech.uslog.example", "1.0.0", null);
             manifest.Save();
 
             var written = JsonValue.Parse(File.ReadAllText(VpmManifest.PathFor(_project)));
 
             Assert.IsTrue(written["somethingElse"]["keep"].AsBool);
             Assert.AreEqual("3.4.0", written["locked"]["com.vrchat.base"]["version"].AsString);
-            Assert.AreEqual("1.0.0", written["locked"]["com.uslog.example"]["version"].AsString);
+            Assert.AreEqual("1.0.0", written["locked"]["tech.uslog.example"]["version"].AsString);
         }
 
         [Test]
         public void Remove_で両方から消える()
         {
             var manifest = VpmManifest.Load(_project);
-            manifest.Add("com.uslog.example", "1.0.0", null);
-            manifest.Remove("com.uslog.example");
+            manifest.Add("tech.uslog.example", "1.0.0", null);
+            manifest.Remove("tech.uslog.example");
 
-            Assert.IsFalse(manifest.IsDependency("com.uslog.example"));
-            Assert.IsNull(manifest.LockedVersion("com.uslog.example"));
+            Assert.IsFalse(manifest.IsDependency("tech.uslog.example"));
+            Assert.IsNull(manifest.LockedVersion("tech.uslog.example"));
         }
 
         [Test]
@@ -92,7 +92,7 @@ namespace Uslog.PackageManager.Editor.Tests
         public void 保存したファイルは改行で終わる()
         {
             var manifest = VpmManifest.Load(_project);
-            manifest.Add("com.uslog.example", "1.0.0", null);
+            manifest.Add("tech.uslog.example", "1.0.0", null);
             manifest.Save();
 
             StringAssert.EndsWith("\n", File.ReadAllText(VpmManifest.PathFor(_project)));
@@ -204,7 +204,7 @@ namespace Uslog.PackageManager.Editor.Tests
   ""scopedRegistries"": [ { ""name"": ""Other"", ""url"": ""https://other.example"", ""scopes"": [""com.other""] } ]
 }");
 
-            UpmConfigWriter.WriteScopedRegistry(manifestPath, "https://private-upm.uslog.tech", "USLOG", new[] { "com.uslog" });
+            UpmConfigWriter.WriteScopedRegistry(manifestPath, "https://private-upm.uslog.tech", "USLOG", new[] { "tech.uslog" });
 
             var written = JsonValue.Parse(File.ReadAllText(manifestPath));
 
@@ -212,7 +212,7 @@ namespace Uslog.PackageManager.Editor.Tests
             Assert.AreEqual(2, written["scopedRegistries"].Count);
             Assert.AreEqual("https://other.example", written["scopedRegistries"][0]["url"].AsString);
             Assert.AreEqual("https://private-upm.uslog.tech", written["scopedRegistries"][1]["url"].AsString);
-            Assert.AreEqual("com.uslog", written["scopedRegistries"][1]["scopes"][0].AsString);
+            Assert.AreEqual("tech.uslog", written["scopedRegistries"][1]["scopes"][0].AsString);
         }
 
         [Test]
@@ -223,13 +223,13 @@ namespace Uslog.PackageManager.Editor.Tests
             File.WriteAllText(manifestPath,
                 @"{""scopedRegistries"":[{""name"":""old"",""url"":""https://private-upm.uslog.tech/"",""scopes"":[""x""]}]}");
 
-            UpmConfigWriter.WriteScopedRegistry(manifestPath, "https://private-upm.uslog.tech", "USLOG", new[] { "com.uslog" });
+            UpmConfigWriter.WriteScopedRegistry(manifestPath, "https://private-upm.uslog.tech", "USLOG", new[] { "tech.uslog" });
 
             var written = JsonValue.Parse(File.ReadAllText(manifestPath));
 
             Assert.AreEqual(1, written["scopedRegistries"].Count);
             Assert.AreEqual("USLOG", written["scopedRegistries"][0]["name"].AsString);
-            Assert.AreEqual("com.uslog", written["scopedRegistries"][0]["scopes"][0].AsString);
+            Assert.AreEqual("tech.uslog", written["scopedRegistries"][0]["scopes"][0].AsString);
         }
 
         [Test]

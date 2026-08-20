@@ -9,16 +9,16 @@ namespace Uslog.PackageManager.Editor.Tests
   ""id"": ""tech.uslog.private"",
   ""uslogDistType"": ""npm-tgz"",
   ""packages"": {
-    ""com.uslog.example"": {
+    ""tech.uslog.example"": {
       ""versions"": {
-        ""1.9.0"":  { ""name"": ""com.uslog.example"", ""version"": ""1.9.0"",  ""displayName"": ""Example"", ""url"": ""https://r/1.9.0.tgz"" },
-        ""1.10.0"": { ""name"": ""com.uslog.example"", ""version"": ""1.10.0"", ""displayName"": ""Example"", ""url"": ""https://r/1.10.0.tgz"",
+        ""1.9.0"":  { ""name"": ""tech.uslog.example"", ""version"": ""1.9.0"",  ""displayName"": ""Example"", ""url"": ""https://r/1.9.0.tgz"" },
+        ""1.10.0"": { ""name"": ""tech.uslog.example"", ""version"": ""1.10.0"", ""displayName"": ""Example"", ""url"": ""https://r/1.10.0.tgz"",
                       ""vpmDependencies"": { ""com.vrchat.base"": ""3.x"" },
                       ""uslogLicense"": { ""commercial"": true, ""individual"": true } },
-        ""2.0.0-rc.1"": { ""name"": ""com.uslog.example"", ""version"": ""2.0.0-rc.1"", ""url"": ""https://r/2.0.0-rc.1.tgz"" }
+        ""2.0.0-rc.1"": { ""name"": ""tech.uslog.example"", ""version"": ""2.0.0-rc.1"", ""url"": ""https://r/2.0.0-rc.1.tgz"" }
       }
     },
-    ""com.uslog.empty"": { ""versions"": {} }
+    ""tech.uslog.empty"": { ""versions"": {} }
   }
 }";
 
@@ -26,7 +26,7 @@ namespace Uslog.PackageManager.Editor.Tests
         public void バージョンは新しい順に並ぶ()
         {
             var listing = UslogListing.FromJson(JsonValue.Parse(Sample));
-            var package = listing.Find("com.uslog.example");
+            var package = listing.Find("tech.uslog.example");
 
             Assert.AreEqual("2.0.0-rc.1", package.Versions[0].VersionText);
             Assert.AreEqual("1.10.0", package.Versions[1].VersionText);
@@ -39,7 +39,7 @@ namespace Uslog.PackageManager.Editor.Tests
             // rc を既定にすると、押しただけで検証版が入ってしまう。
             var listing = UslogListing.FromJson(JsonValue.Parse(Sample));
 
-            Assert.AreEqual("1.10.0", listing.Find("com.uslog.example").Latest.VersionText);
+            Assert.AreEqual("1.10.0", listing.Find("tech.uslog.example").Latest.VersionText);
         }
 
         [Test]
@@ -47,7 +47,7 @@ namespace Uslog.PackageManager.Editor.Tests
         {
             var listing = UslogListing.FromJson(JsonValue.Parse(Sample));
 
-            Assert.IsNull(listing.Find("com.uslog.empty"));
+            Assert.IsNull(listing.Find("tech.uslog.empty"));
             Assert.AreEqual(1, listing.Packages.Count);
         }
 
@@ -55,7 +55,7 @@ namespace Uslog.PackageManager.Editor.Tests
         public void 許諾区分と_VPM_依存を読む()
         {
             var listing = UslogListing.FromJson(JsonValue.Parse(Sample));
-            var latest = listing.Find("com.uslog.example").Latest;
+            var latest = listing.Find("tech.uslog.example").Latest;
 
             Assert.IsTrue(latest.License.Commercial);
             Assert.IsTrue(latest.License.Individual);
@@ -69,7 +69,7 @@ namespace Uslog.PackageManager.Editor.Tests
             // 「指定なし」と「全部不可」は違う。埋めてしまうと嘘になる。
             var listing = UslogListing.FromJson(JsonValue.Parse(Sample));
 
-            Assert.IsNull(listing.Find("com.uslog.example").Find("1.9.0").License);
+            Assert.IsNull(listing.Find("tech.uslog.example").Find("1.9.0").License);
         }
 
         [Test]
@@ -84,10 +84,10 @@ namespace Uslog.PackageManager.Editor.Tests
         [Test]
         public void 表示名が無ければ名前を出す()
         {
-            var package = UslogPackage.FromJson("com.uslog.bare",
+            var package = UslogPackage.FromJson("tech.uslog.bare",
                 JsonValue.Parse(@"{""versions"":{""1.0.0"":{""version"":""1.0.0""}}}"));
 
-            Assert.AreEqual("com.uslog.bare", package.Title);
+            Assert.AreEqual("tech.uslog.bare", package.Title);
         }
 
         [Test]

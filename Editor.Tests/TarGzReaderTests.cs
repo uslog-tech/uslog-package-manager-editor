@@ -28,7 +28,7 @@ namespace Uslog.PackageManager.Editor.Tests
         public void npm_の_tarball_を展開して_package_を剥がす()
         {
             var tgz = BuildTarGz(
-                ("package/package.json", "{\"name\":\"com.uslog.example\"}"),
+                ("package/package.json", "{\"name\":\"tech.uslog.example\"}"),
                 ("package/Runtime/Thing.cs", "// hello"));
 
             var written = TarGzReader.Extract(new MemoryStream(tgz), _temp);
