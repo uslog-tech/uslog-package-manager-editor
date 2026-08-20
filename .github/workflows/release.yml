@@ -1,12 +1,23 @@
 name: release
 
-# main に入った時点で package.json の version を見て、まだタグが無ければ
-# Release を作り、リスティング（index.json）を作り直して Pages に出す。
+# GitHub で Release を publish した時点で、zip を作って添付し、
+# VPM のリスティング（index.json）を作り直して Pages に出す。
 #
-# タグが既にあれば何もしない。同じ内容を push し直しても壊れないようにするため。
+# 「main への push で自動リリース」にはしていない。ワークフローが
+# GITHUB_TOKEN で作った Release は release イベントを発火させないため、
+# その形にすると登録側が一生走らない。リリースを切るのは人の操作にして、
+# そこから先を全部自動にしている。
+#
+# 手順:
+#   1. package.json の version を上げて main に push
+#   2. GitHub で「Draft a new release」→ タグ v<version> を新規作成 → Publish
+#   3. あとはここが zip の添付とリスティングの更新までやる
+#
+# workflow_dispatch は「リリースは増やさずリスティングだけ出し直す」用。
+# Pages の設定を入れた直後などに使う。
 on:
-  push:
-    branches: [main]
+  release:
+    types: [published]
   workflow_dispatch:
 
 # 既定は何も渡さない。必要なものをジョブごとに足す。
@@ -16,54 +27,48 @@ on:
 # 「Workflow permissions」を Read and write に変える必要は無い。
 permissions: {}
 
-# リリースと Pages の書き込みが重なると、古い index.json が後から乗る。
+# 添付と Pages の書き込みが重なると、古い index.json が後から乗る。
 concurrency:
   group: release
   cancel-in-progress: false
 
 jobs:
-  release:
+  assets:
+    # workflow_dispatch のときは添えるリリースが無いので回さない。
+    if: github.event_name == 'release'
     runs-on: ubuntu-latest
-    # Release とタグを作るため。ここ以外に書き込む先は無い。
+    # Release にアセットを足すため。ここ以外に書き込む先は無い。
     permissions:
       contents: write
-    outputs:
-      created: ${{ steps.check.outputs.created }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          # Release のタグの中身を固める。main の先端ではない
+          # （タグを打ってから main が進んでいても、配るものはタグと一致させる）。
+          ref: ${{ github.event.release.tag_name }}
 
-      - name: パッケージ情報を読む
+      - name: タグと package.json を突き合わせる
         id: package
+        env:
+          TAG: ${{ github.event.release.tag_name }}
         run: |
           set -euo pipefail
           NAME=$(jq -r .name package.json)
           VERSION=$(jq -r .version package.json)
-          echo "name=$NAME" >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
-          echo "zip=$NAME-$VERSION.zip" >> "$GITHUB_OUTPUT"
 
-      - name: 既に出しているバージョンか確かめる
-        id: check
-        env:
-          TAG: ${{ steps.package.outputs.tag }}
-        run: |
-          set -euo pipefail
-          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
-            echo "$TAG は既にあります。何もしません。"
-            echo "created=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "created=true" >> "$GITHUB_OUTPUT"
+          if [ "$TAG" != "v$VERSION" ]; then
+            echo "タグ ($TAG) と package.json の version ($VERSION) が食い違っています。" >&2
+            echo "タグは v<version> の形にしてください。" >&2
+            exit 1
           fi
 
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "zip=$NAME-$VERSION.zip" >> "$GITHUB_OUTPUT"
+
       - name: zip を作る
-        if: steps.check.outputs.created == 'true'
         env:
-          NAME: ${{ steps.package.outputs.name }}
-          VERSION: ${{ steps.package.outputs.version }}
-          TAG: ${{ steps.package.outputs.tag }}
+          TAG: ${{ github.event.release.tag_name }}
           ZIP: ${{ steps.package.outputs.zip }}
           REPO: ${{ github.repository }}
         run: |
@@ -96,7 +101,6 @@ jobs:
           echo "$ZIP $SHA"
 
       - name: 中身を確かめる
-        if: steps.check.outputs.created == 'true'
         env:
           ZIP: ${{ steps.package.outputs.zip }}
         run: |
@@ -115,25 +119,25 @@ jobs:
             exit 1
           fi
 
-      - name: Release を作る
-        if: steps.check.outputs.created == 'true'
+      - name: Release に添付する
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.package.outputs.tag }}
-          VERSION: ${{ steps.package.outputs.version }}
+          TAG: ${{ github.event.release.tag_name }}
           ZIP: ${{ steps.package.outputs.zip }}
         run: |
           set -euo pipefail
-          gh release create "$TAG" \
+          # --clobber を付けておく。ワークフローを回し直したときに
+          # 「既にある」で止まらないように。
+          gh release upload "$TAG" \
             "build/out/$ZIP" \
             "build/out/package.json" \
-            --title "$TAG" \
-            --notes "CHANGELOG: https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md"
+            --clobber
 
   listing:
-    # リリースを作らなかったときも回す。listing.json の文言だけ直した、
-    # Pages の設定を入れ直した、といった場合に出し直せるように。
-    needs: release
+    needs: assets
+    # workflow_dispatch では assets を飛ばすので、skipped でも進める。
+    # 添付に失敗したときだけは出さない（zip の無いリリースを載せないため）。
+    if: always() && needs.assets.result != 'failure' && needs.assets.result != 'cancelled'
     runs-on: ubuntu-latest
     permissions:
       # チェックアウトと、Release 一覧を読むため
