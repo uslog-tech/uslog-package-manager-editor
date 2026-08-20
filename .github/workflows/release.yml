@@ -70,16 +70,25 @@ jobs:
         id: build
         env:
           TAG: ${{ github.event.release.tag_name }}
-          ZIP: ${{ steps.package.outputs.zip }}
+          # ここを ZIP という名前にしてはいけない。
+          #
+          # Info-ZIP の zip は環境変数 ZIP（と ZIPOPT）を「zip コマンドの
+          # 直後に挿入される既定の引数」として読む。ZIP を置くと
+          #
+          #   zip -r "$OUT/$NAME" .
+          #     → zip <ZIP の中身> -r "$OUT/$NAME" .
+          #
+          # と展開され、ZIP の中身のほうがアーカイブ名として使われる。
+          # 本来の出力先は入力ファイル扱いになり "name not matched" の
+          # 警告だけ出して、アーカイブはカレント（stage）に作られる。
+          # zip の終了コードは 0 なので、気づけるのは出力を確認したときだけ。
+          ZIP_NAME: ${{ steps.package.outputs.zip }}
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
 
           # 作業場所はワークスペースの外に絶対パスで取る。
-          # 以前ここを ./build にして相対パスで組み立てていたら、zip が
-          # 「成功したのに出力が無い」状態になり、原因がログから読めなかった。
-          # 中を固めるディレクトリと出力先が入れ子になっていると、
-          # 何が起きたのか切り分けようがない。
+          # 固める元と出力先が入れ子だと、何がどこへ書かれたのか追えない。
           STAGE="$RUNNER_TEMP/uslog-stage"
           OUT="$RUNNER_TEMP/uslog-out"
           rm -rf "$STAGE" "$OUT"
@@ -95,7 +104,7 @@ jobs:
 
           # url は必ずここで確定させる。手で書いた値がずれていても、
           # 配るものと指し先が食い違わないようにする。
-          URL="https://github.com/$REPO/releases/download/$TAG/$ZIP"
+          URL="https://github.com/$REPO/releases/download/$TAG/$ZIP_NAME"
           jq --arg url "$URL" '.url = $url' "$STAGE/package.json" > "$STAGE/package.json.new"
           mv "$STAGE/package.json.new" "$STAGE/package.json"
 
@@ -105,13 +114,14 @@ jobs:
           # zip の中身はパッケージのルートそのもの。VPM は展開したものを
           # Packages/<name>/ にそのまま置く（1 段包むと壊れる）。
           #
-          # -q は付けない。前回「zip は成功したのに出力が無い」で落ちたとき、
-          # 何が起きたのかログに一切残っていなかった。数十行増えるだけなので、
+          # -q は付けない。ZIP 環境変数の件は、zip を黙らせていたせいで
+          # 2 回続けて原因が分からなかった。数十行増えるだけなので、
           # 黙らせるより見えるほうがよい。
-          ( cd "$STAGE" && zip -r "$OUT/$ZIP" . )
+          ( cd "$STAGE" && zip -r "$OUT/$ZIP_NAME" . )
 
-          # zip の終了コードだけを信じない。実際に出来ているかを見る。
-          if [ ! -s "$OUT/$ZIP" ]; then
+          # zip の終了コードだけを信じない。ZIP 環境変数のときのように、
+          # 0 を返しながら別の場所に書いていることがある。
+          if [ ! -s "$OUT/$ZIP_NAME" ]; then
             echo "zip が作られませんでした。" >&2
             echo "--- $STAGE ---" >&2; ls -la "$STAGE" >&2
             echo "--- $OUT ---"   >&2; ls -la "$OUT"   >&2
@@ -120,12 +130,12 @@ jobs:
 
           # zipSHA256 は zip の中には入れない（自分自身のハッシュになってしまう）。
           # リリースに添える package.json とリスティングだけが持つ。
-          SHA=$(sha256sum "$OUT/$ZIP" | cut -d' ' -f1)
+          SHA=$(sha256sum "$OUT/$ZIP_NAME" | cut -d' ' -f1)
           jq --arg sha "$SHA" '.zipSHA256 = $sha' "$STAGE/package.json" > "$OUT/package.json"
 
-          echo "zip_path=$OUT/$ZIP" >> "$GITHUB_OUTPUT"
+          echo "zip_path=$OUT/$ZIP_NAME" >> "$GITHUB_OUTPUT"
           echo "manifest_path=$OUT/package.json" >> "$GITHUB_OUTPUT"
-          echo "$ZIP $SHA"
+          echo "$ZIP_NAME $SHA"
 
       - name: 中身を確かめる
         env:
