@@ -61,15 +61,28 @@ for (let page = 1; page <= 10; page++) {
 const packages = {};
 let counted = 0;
 
+// 落としたものを覚えておく。「1 つも見つからなかった」とだけ言われても、
+// リリースが無いのか、リリースはあるがアセットが付いていないのか区別できない。
+const drafts = [];
+const missingAssets = [];
+
 for (const release of releases) {
-  if (release.draft) continue;
+  if (release.draft) {
+    drafts.push(release.tag_name);
+    continue;
+  }
 
   const manifestAsset = release.assets.find((a) => a.name === 'package.json');
   const zipAsset = release.assets.find((a) => a.name.endsWith('.zip'));
 
   if (!manifestAsset || !zipAsset) {
-    // タグだけ手で作ったリリースなど。黙って飛ばすと理由が分からないので出す。
-    console.warn(`build-listing: ${release.tag_name} に package.json か zip が無いので飛ばします`);
+    // タグだけ手で作ったリリースか、assets ジョブが失敗したリリース。
+    // 黙って飛ばすと理由が分からないので、何が無いのかまで出す。
+    const lacking = [!zipAsset && 'zip', !manifestAsset && 'package.json'].filter(Boolean);
+    missingAssets.push(release.tag_name);
+    console.warn(
+      `build-listing: ${release.tag_name} に ${lacking.join(' と ')} が付いていないので飛ばします`
+    );
     continue;
   }
 
@@ -98,9 +111,35 @@ for (const release of releases) {
 }
 
 if (counted === 0) {
-  // 空のリスティングを配ると、VCC 側では「リポジトリはあるが何も無い」に見える。
-  // 事故と区別が付かないので、ここで落として気づけるようにする。
-  fatal('リリースが 1 つも見つかりませんでした');
+  // ここで空の index.json を出してはいけない。既に VCC へ登録している人には
+  // 「リポジトリはあるのに中身が消えた」ように見える。落とせば前回の Pages が
+  // そのまま残るので、そちらのほうが害が小さい。
+  //
+  // ただし「1 つも見つからなかった」とだけ言われても直しようがないので、
+  // 何がどう足りないのかまで書く。
+  if (releases.length === 0) {
+    fatal(
+      'リリースが 1 つもありません。\n' +
+        '  先に GitHub で Release を publish してください（タグは v<version>）。'
+    );
+  }
+
+  const detail = [];
+  if (missingAssets.length) {
+    detail.push(
+      `  zip と package.json が付いていないリリース: ${missingAssets.join(', ')}\n` +
+        '  assets ジョブ（zip を作る）が失敗していないか確認してください。\n' +
+        '  そのリリースを作り直すか、Actions から release ワークフローを再実行すると付きます。'
+    );
+  }
+  if (drafts.length) {
+    detail.push(`  下書きのまま publish されていないリリース: ${drafts.join(', ')}`);
+  }
+
+  fatal(
+    `リリースは ${releases.length} 件ありますが、リスティングに載せられるものが 1 つもありません。\n` +
+      detail.join('\n')
+  );
 }
 
 const listing = {
