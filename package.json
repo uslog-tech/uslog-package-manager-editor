@@ -1,7 +1,7 @@
 {
   "name": "tech.uslog.package-manager",
   "displayName": "USLOG Package Manager",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "unity": "2022.3",
   "description": "USLOG のプライベートレジストリ用クライアント。ログイン・契約しているパッケージの一覧・インストール・更新・削除を Unity の中で完結させます。",
   "author": {
