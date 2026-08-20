@@ -6,9 +6,14 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
   package:
     runs-on: ubuntu-latest
+    # チェックアウトするだけ。書き込む先は無い。
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
