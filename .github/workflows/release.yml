@@ -1,0 +1,158 @@
+name: release
+
+# main に入った時点で package.json の version を見て、まだタグが無ければ
+# Release を作り、リスティング（index.json）を作り直して Pages に出す。
+#
+# タグが既にあれば何もしない。同じ内容を push し直しても壊れないようにするため。
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+# リリースと Pages の書き込みが重なると、古い index.json が後から乗る。
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    outputs:
+      created: ${{ steps.check.outputs.created }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: パッケージ情報を読む
+        id: package
+        run: |
+          set -euo pipefail
+          NAME=$(jq -r .name package.json)
+          VERSION=$(jq -r .version package.json)
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "zip=$NAME-$VERSION.zip" >> "$GITHUB_OUTPUT"
+
+      - name: 既に出しているバージョンか確かめる
+        id: check
+        env:
+          TAG: ${{ steps.package.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "$TAG は既にあります。何もしません。"
+            echo "created=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "created=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: zip を作る
+        if: steps.check.outputs.created == 'true'
+        env:
+          NAME: ${{ steps.package.outputs.name }}
+          VERSION: ${{ steps.package.outputs.version }}
+          TAG: ${{ steps.package.outputs.tag }}
+          ZIP: ${{ steps.package.outputs.zip }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p build/pkg build/out
+
+          # zip の中身はパッケージのルートそのもの。VPM は展開したものを
+          # Packages/<name>/ にそのまま置く（1 段包むと壊れる）。
+          rsync -a \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='.gitignore' \
+            --exclude='.gitattributes' \
+            --exclude='build' \
+            ./ build/pkg/
+
+          # url は必ずここで確定させる。手で書いた値がずれていても、
+          # 配るものと指し先が食い違わないようにする。
+          URL="https://github.com/$REPO/releases/download/$TAG/$ZIP"
+          jq --arg url "$URL" '.url = $url' build/pkg/package.json > build/pkg/package.json.tmp
+          mv build/pkg/package.json.tmp build/pkg/package.json
+
+          (cd build/pkg && zip -q -r "../out/$ZIP" .)
+
+          # zipSHA256 は zip の中には入れない（自分自身のハッシュになってしまう）。
+          # リリースに添える package.json とリスティングだけが持つ。
+          SHA=$(sha256sum "build/out/$ZIP" | cut -d' ' -f1)
+          jq --arg sha "$SHA" '.zipSHA256 = $sha' build/pkg/package.json > build/out/package.json
+
+          echo "$ZIP $SHA"
+
+      - name: 中身を確かめる
+        if: steps.check.outputs.created == 'true'
+        env:
+          ZIP: ${{ steps.package.outputs.zip }}
+        run: |
+          set -euo pipefail
+          LIST=$(unzip -Z1 "build/out/$ZIP")
+
+          # ルートに package.json が無い zip を配ると、VCC は入れたあとで壊れる
+          echo "$LIST" | grep -qx './package.json' || echo "$LIST" | grep -qx 'package.json' \
+            || (echo "zip のルートに package.json がありません" && exit 1)
+
+          echo "$LIST" | grep -q 'Editor/' \
+            || (echo "Editor/ が入っていません" && exit 1)
+
+          if echo "$LIST" | grep -qE '(^|/)\.git(/|$)'; then
+            echo ".git が混ざっています"
+            exit 1
+          fi
+
+      - name: Release を作る
+        if: steps.check.outputs.created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.package.outputs.tag }}
+          VERSION: ${{ steps.package.outputs.version }}
+          ZIP: ${{ steps.package.outputs.zip }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" \
+            "build/out/$ZIP" \
+            "build/out/package.json" \
+            --title "$TAG" \
+            --notes "CHANGELOG: https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md"
+
+  listing:
+    # リリースを作らなかったときも回す。listing.json の文言だけ直した、
+    # Pages の設定を入れ直した、といった場合に出し直せるように。
+    needs: release
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/configure-pages@v5
+        id: pages
+
+      - name: index.json を組み立てる
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PAGES_URL: ${{ steps.pages.outputs.base_url }}
+        run: node .github/scripts/build-listing.mjs out
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+
+      - uses: actions/deploy-pages@v4
+        id: deploy

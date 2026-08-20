@@ -1,0 +1,6 @@
+{
+  "name": "USLOG",
+  "id": "tech.uslog.vpm",
+  "author": "USLOG",
+  "description": "USLOG が配る公開パッケージのリスティング。購入が必要なパッケージはここには載らず、USLOG Package Manager から取得します。"
+}

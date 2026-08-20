@@ -1,0 +1,24 @@
+{
+  "name": "tech.uslog.package-manager",
+  "displayName": "USLOG Package Manager",
+  "version": "0.1.0",
+  "unity": "2022.3",
+  "description": "USLOG のプライベートレジストリ用クライアント。ログイン・契約しているパッケージの一覧・インストール・更新・削除を Unity の中で完結させます。",
+  "author": {
+    "name": "USLOG",
+    "url": "https://uslog.tech"
+  },
+  "license": "MIT",
+  "keywords": [
+    "uslog",
+    "vpm",
+    "upm",
+    "vrchat",
+    "package manager",
+    "registry"
+  ],
+  "vpmDependencies": {},
+  "url": "https://github.com/uslog-tech/uslog-package-manager-editor/releases/download/v0.1.0/tech.uslog.package-manager-0.1.0.zip",
+  "changelogUrl": "https://github.com/uslog-tech/uslog-package-manager-editor/blob/main/CHANGELOG.md",
+  "documentationUrl": "https://github.com/uslog-tech/uslog-package-manager-editor/blob/main/README.md"
+}

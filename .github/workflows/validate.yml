@@ -1,0 +1,24 @@
+name: validate
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: パッケージの形を確かめる
+        run: node .github/scripts/validate-package.mjs
+
+      - name: リスティングの組み立てを空回しする
+        # 実際の API は叩かない。構文エラーで release が落ちるのを先に見つける。
+        run: node --check .github/scripts/build-listing.mjs

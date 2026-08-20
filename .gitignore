@@ -1,0 +1,18 @@
+# Unity がプロジェクト内で作るもの。パッケージ単体のリポジトリなので
+# 本来は出てこないが、検証用にプロジェクトへ symlink したときに紛れ込む。
+Library/
+Temp/
+Obj/
+Build/
+Logs/
+UserSettings/
+*.csproj
+*.sln
+*.user
+.vs/
+.idea/
+.vscode/
+
+# ビルド生成物
+*.zip
+index.json
